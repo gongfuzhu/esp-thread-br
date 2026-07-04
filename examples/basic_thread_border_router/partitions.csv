@@ -1,9 +1,7 @@
 # Name,   Type, SubType, Offset,  Size, Flags
 # Note: if you have increased the bootloader size, make sure to update the offsets to avoid overlap
+# 4MB layout for ESP32-C6 host: single app (no dual OTA), no rcp_fw (RCP flashed manually on H2).
 nvs,        data, nvs,      , 0x6000,
-otadata,    data, ota,      , 0x2000,
 phy_init,   data, phy,      , 0x1000,
-ota_0,      app,  ota_0,    , 2M,
-ota_1,      app,  ota_1,    , 2M,
-web_storage,data, spiffs,   , 200K,
-rcp_fw,     data, spiffs,   , 640K,
+factory,    app,  factory,  , 0x3A0000,
+web_storage,data, spiffs,   , 0x40000,

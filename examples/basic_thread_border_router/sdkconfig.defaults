@@ -1,10 +1,10 @@
-# ESP32-S3 is the host SoC on ESP-Thread-Border-Router board
-CONFIG_IDF_TARGET="esp32s3"
+# ESP32-C6 host + external ESP32-H2 RCP (UART), adapted for C6+H2 / 4MB flash
+CONFIG_IDF_TARGET="esp32c6"
 
 #
 # Serial flasher config
 #
-CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 # end of Serial flasher config
 
 #
@@ -53,7 +53,9 @@ CONFIG_OPENTHREAD_TASK_SIZE=8192
 #
 # OpenThread Border Router Example
 #
-CONFIG_AUTO_UPDATE_RCP=y
+# No RESET/BOOT wired to H2 (only TX=4/RX=5/GND) -> host cannot auto-flash/reset RCP.
+# H2 must be flashed with ot_rcp manually; disable auto update.
+# CONFIG_AUTO_UPDATE_RCP is not set
 # end of OpenThread Border Router Example
 
 #
@@ -89,11 +91,31 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=5120
 # end of ESP System Settings
 
 #
-# ESP Border Router Board Kit
+# ESP Thread Border Router board / RCP wiring
 #
-CONFIG_ESP_BR_BOARD_DEV_KIT=y
+# Standalone dev kit: manually wired RCP over UART
+CONFIG_ESP_BR_BOARD_STANDALONE=y
+# RCP target is ESP32-H2
+CONFIG_ESP_BR_H2_TARGET=y
+# UART pins to H2 RCP (host TX=GPIO4 -> H2 RX, host RX=GPIO5 -> H2 TX)
+CONFIG_PIN_TO_RCP_TX=4
+CONFIG_PIN_TO_RCP_RX=5
+# Console over onboard USB Serial/JTAG (Type-C)
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
-# end of ESP Border Router Board Kit
+# Web GUI to view/configure the Thread network (selects Commissioner + Joiner)
+CONFIG_OPENTHREAD_BR_START_WEB=y
+# Auto-connect Wi-Fi and form Thread network on boot
+CONFIG_OPENTHREAD_BR_AUTO_START=y
+# SoftAP fallback provisioning (http://192.168.4.1) when no Wi-Fi credentials
+CONFIG_OPENTHREAD_BR_SOFTAP_SETUP=y
+# end of ESP Thread Border Router board / RCP wiring
+
+#
+# Wi-Fi uplink credentials
+#
+CONFIG_EXAMPLE_WIFI_SSID="7.4"
+CONFIG_EXAMPLE_WIFI_PASSWORD="ww666666"
+# end of Wi-Fi uplink credentials
 
 #
 # Ethernet
