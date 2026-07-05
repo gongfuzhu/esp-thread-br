@@ -1,0 +1,59 @@
+menu "MQTT OT Bridge"
+
+    config MQTT_OT_BRIDGE_ENABLE
+        bool "Enable MQTT to OpenThread CoAP bridge"
+        default n
+        help
+            启用后，BR 连接局域网 MQTT broker，把下行命令翻译为 CoAP 请求，
+            并把设备响应与 SRP 设备清单发布回 MQTT。
+
+    if MQTT_OT_BRIDGE_ENABLE
+
+        config MQTT_OT_BRIDGE_BROKER_URI
+            string "MQTT broker URI"
+            default "mqtt://192.168.1.100:1883"
+            help
+                局域网 broker 地址，形如 mqtt://host:port(不使用 TLS)。
+
+        config MQTT_OT_BRIDGE_USERNAME
+            string "MQTT username"
+            default "bridge"
+
+        config MQTT_OT_BRIDGE_PASSWORD
+            string "MQTT password"
+            default "changeme"
+
+        config MQTT_OT_BRIDGE_TOPIC_PREFIX
+            string "MQTT topic prefix"
+            default "otbr"
+            help
+                所有 topic 的前缀，如 otbr/cmd/unicast/<eui64>。
+
+        config MQTT_OT_BRIDGE_MULTICAST_ADDR
+            string "CoAP multicast address"
+            default "ff03::1"
+
+        config MQTT_OT_BRIDGE_COAP_URI
+            string "CoAP downlink resource path on devices"
+            default "ctrl"
+            help
+                下行命令发往设备的 CoAP Uri-Path(不含前导斜杠)。
+
+        config MQTT_OT_BRIDGE_ACK_URI
+            string "CoAP uplink resource path on BR"
+            default "ack"
+            help
+                BR 侧接收设备主动上报的 CoAP 资源 Uri-Path。
+
+        config MQTT_OT_BRIDGE_COAP_PORT
+            int "CoAP port"
+            default 5683
+
+        config MQTT_OT_BRIDGE_REGISTRY_INTERVAL_S
+            int "Device registry publish interval (seconds)"
+            default 30
+            range 5 3600
+
+    endif
+
+endmenu

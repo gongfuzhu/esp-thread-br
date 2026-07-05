@@ -1,0 +1,3 @@
+schema: spec-driven
+created: 2026-07-04
+goal: 让局域网 MQTT 客户端经 BR 控制 Thread IoT 设备并获取状态

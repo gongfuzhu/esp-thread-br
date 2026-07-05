@@ -29,6 +29,7 @@
 
 #include "border_router_launch.h"
 #include "esp_br_web.h"
+#include "mqtt_ot_bridge.h"
 
 #define TAG "esp_ot_br"
 
@@ -105,4 +106,8 @@ void app_main(void)
 #endif
 
     launch_openthread_border_router(&openthread_config, &rcp_update_config);
+
+#if CONFIG_MQTT_OT_BRIDGE_ENABLE
+    ESP_ERROR_CHECK(mqtt_ot_bridge_start());
+#endif
 }
