@@ -30,6 +30,7 @@ static char s_eui64_str[17];
 
 // 待上报请求(由 ctrl 回调填充，定时器回调消费)。单槽即可：命令处理是低频的。
 static char s_pending_reqid[REQID_MAX];
+static bool s_pending_is_blink = false;
 static TimerHandle_t s_report_timer = NULL;
 static TimerHandle_t s_blink_timer = NULL;
 
@@ -85,8 +86,9 @@ static void srp_register(otInstance *inst) {
 // ---------------------------------------------------------------------------
 
 // 构造状态 JSON 并单播上报到 BR(SRP server)的 ack 资源。
+// action 非 NULL 时附加 "action" 字段，且 state 固定为 "off"（用于 blink，避免竞态读 GPIO）。
 // 调用者必须已持 OT 锁。
-static void device_report(const char *reqid) {
+static void device_report(const char *reqid, const char *action) {
     otInstance *inst = esp_openthread_get_instance();
 
     const otSockAddr *server = otSrpClientGetServerAddress(inst);
@@ -101,7 +103,11 @@ static void device_report(const char *reqid) {
     }
     cJSON_AddStringToObject(root, "id", s_eui64_str);
     cJSON_AddStringToObject(root, "reqid", reqid);
-    cJSON_AddStringToObject(root, "state", device_switch_get() ? "on" : "off");
+    const char *state = action != NULL ? "off" : (device_switch_get() ? "on" : "off");
+    cJSON_AddStringToObject(root, "state", state);
+    if (action != NULL) {
+        cJSON_AddStringToObject(root, "action", action);
+    }
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     if (json == NULL) {
@@ -128,7 +134,8 @@ static void device_report(const char *reqid) {
         otMessageFree(msg);
         ESP_LOGE(TAG, "report send err=%d", err);
     } else {
-        ESP_LOGI(TAG, "reported state=%s reqid=%s", device_switch_get() ? "on" : "off", reqid);
+        ESP_LOGI(TAG, "reported state=%s%s%s reqid=%s", state,
+                 action != NULL ? " action=" : "", action != NULL ? action : "", reqid);
     }
     free(json);
 }
@@ -138,7 +145,7 @@ static void device_report(const char *reqid) {
 static void report_timer_cb(TimerHandle_t t) {
     (void)t;
     esp_openthread_lock_acquire(portMAX_DELAY);
-    device_report(s_pending_reqid);
+    device_report(s_pending_reqid, s_pending_is_blink ? "blink" : NULL);
     esp_openthread_lock_release();
 }
 
@@ -216,12 +223,24 @@ static void ctrl_request_handler(void *ctx, otMessage *msg, const otMessageInfo 
         ESP_LOGW(TAG, "ctrl: bad command payload");
         return;
     }
-    if (!is_query) {
+    if (is_blink) {
+        device_switch_set(true);
+        TickType_t blink_ticks = pdMS_TO_TICKS(CONFIG_IOT_DEVICE_BLINK_MS);
+        if (blink_ticks < 1) {
+            blink_ticks = 1;
+        }
+        if (s_blink_timer != NULL) {
+            xTimerChangePeriod(s_blink_timer, blink_ticks, 0);
+            xTimerStart(s_blink_timer, 0);
+        }
+        ESP_LOGI(TAG, "ctrl: blink %u ms reqid=%s", (unsigned)CONFIG_IOT_DEVICE_BLINK_MS, reqid);
+    } else if (!is_query) {
         device_switch_set(on);
         ESP_LOGI(TAG, "ctrl: set switch=%d reqid=%s", on, reqid);
     } else {
         ESP_LOGI(TAG, "ctrl: query reqid=%s", reqid);
     }
+    s_pending_is_blink = is_blink;
 
     // 组播命令(本地收包地址为多播，IPv6 多播首字节 0xff)加随机抖动，避免响应风暴。
     // 上报统一交给单次定时器承载：既实现抖动，又避免在 OT 回调里 vTaskDelay 阻塞协议栈。
