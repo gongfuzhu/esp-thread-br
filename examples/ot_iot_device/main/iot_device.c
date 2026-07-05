@@ -31,6 +31,7 @@ static char s_eui64_str[17];
 // 待上报请求(由 ctrl 回调填充，定时器回调消费)。单槽即可：命令处理是低频的。
 static char s_pending_reqid[REQID_MAX];
 static TimerHandle_t s_report_timer = NULL;
+static TimerHandle_t s_blink_timer = NULL;
 
 // ---------------------------------------------------------------------------
 // SRP 自动注册(用 EUI64 作 host 名)
@@ -141,6 +142,14 @@ static void report_timer_cb(TimerHandle_t t) {
     esp_openthread_lock_release();
 }
 
+// 闪烁定时器回调:关闭 LED
+static void blink_off_timer_cb(TimerHandle_t t) {
+    (void)t;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    device_switch_set(false);
+    esp_openthread_lock_release();
+}
+
 // ---------------------------------------------------------------------------
 // CoAP ctrl 资源:解析命令 + 执行开关 + 触发上报
 // ---------------------------------------------------------------------------
@@ -244,6 +253,7 @@ void iot_device_start(void) {
     device_switch_init();
 
     s_report_timer = xTimerCreate("iot_report", 1, pdFALSE, NULL, report_timer_cb);
+    s_blink_timer = xTimerCreate("iot_blink", 1, pdFALSE, NULL, blink_off_timer_cb);
 
     esp_openthread_lock_acquire(portMAX_DELAY);
     otInstance *inst = esp_openthread_get_instance();
