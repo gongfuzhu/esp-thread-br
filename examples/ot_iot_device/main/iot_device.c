@@ -172,7 +172,7 @@ static int coap_read_payload(otMessage *msg, char *buf, int buf_size) {
 
 // 解析 {"reqid":"..","cmd":"on|off|query"}。识别成功返回 true。
 static bool parse_command(const char *json, char *reqid_out, size_t reqid_cap,
-                          bool *on_out, bool *is_query_out) {
+                          bool *on_out, bool *is_query_out, bool *is_blink_out) {
     cJSON *root = cJSON_Parse(json);
     if (root == NULL) {
         return false;
@@ -181,6 +181,7 @@ static bool parse_command(const char *json, char *reqid_out, size_t reqid_cap,
     reqid_out[0] = '\0';
     *is_query_out = false;
     *on_out = false;
+    *is_blink_out = false;
 
     cJSON *reqid = cJSON_GetObjectItem(root, "reqid");
     if (cJSON_IsString(reqid) && reqid->valuestring != NULL) {
@@ -195,6 +196,8 @@ static bool parse_command(const char *json, char *reqid_out, size_t reqid_cap,
             *on_out = false; ok = true;
         } else if (strcmp(cmd->valuestring, "query") == 0) {
             *is_query_out = true; ok = true;
+        } else if (strcmp(cmd->valuestring, "blink") == 0) {
+            *is_blink_out = true; ok = true;
         }
     }
     cJSON_Delete(root);
@@ -208,8 +211,8 @@ static void ctrl_request_handler(void *ctx, otMessage *msg, const otMessageInfo 
     coap_read_payload(msg, payload, sizeof(payload));
 
     char reqid[REQID_MAX];
-    bool on = false, is_query = false;
-    if (!parse_command(payload, reqid, sizeof(reqid), &on, &is_query)) {
+    bool on = false, is_query = false, is_blink = false;
+    if (!parse_command(payload, reqid, sizeof(reqid), &on, &is_query, &is_blink)) {
         ESP_LOGW(TAG, "ctrl: bad command payload");
         return;
     }
