@@ -113,9 +113,11 @@ static void registry_collect(bridge_dev_entry_t *arr, size_t cap, size_t *out_co
         e->service[0] = '\0';
         const otSrpServerService *svc = otSrpServerHostGetNextService(host, NULL);
         if (svc != NULL) {
-            const char *iname = otSrpServerServiceGetInstanceName(svc);
-            if (iname != NULL) {
-                strncpy(e->service, iname, sizeof(e->service) - 1);
+            // 上报服务类型名(如 "_iot._udp")用于区分设备种类；
+            // instance name 等于 EUI64，已在 e->eui64 中，不重复上报。
+            const char *sname = otSrpServerServiceGetServiceName(svc);
+            if (sname != NULL) {
+                strncpy(e->service, sname, sizeof(e->service) - 1);
                 e->service[sizeof(e->service) - 1] = '\0';
             }
         }
@@ -247,7 +249,9 @@ static void handle_downlink(const char *topic_suffix, const char *data, int data
     if (cmd.kind == BRIDGE_CMD_UNICAST) {
         otIp6Address dst;
         if (bridge_lookup_ipv6_by_eui64(cmd.eui64, &dst)) {
-            coap_send(&dst, true, data, data_len);
+            // 单播也用 NON：回执统一走设备 → /ack → dev/response，由服务端凭 reqid 对账。
+            // 若用 CON 而设备不回 CoAP ACK，会触发 BR 重传，导致设备重复执行与重复上报。
+            coap_send(&dst, false, data, data_len);
         } else {
             ESP_LOGW(TAG, "unicast target not found in SRP");
         }
@@ -267,13 +271,21 @@ static void handle_downlink(const char *topic_suffix, const char *data, int data
 // ---------------------------------------------------------------------------
 
 static void publish_registry(void) {
-    bridge_dev_entry_t entries[REGISTRY_MAX_DEVICES];
+    // 注意：entries 数组较大(REGISTRY_MAX_DEVICES × sizeof(bridge_dev_entry_t) ≈ 4KB)，
+    // 本函数在 FreeRTOS 定时器服务任务(栈很小，~2KB)中执行，放栈上会触发栈保护错误。
+    // 故用堆分配。定时器串行触发，无重入风险。
+    bridge_dev_entry_t *entries = calloc(REGISTRY_MAX_DEVICES, sizeof(bridge_dev_entry_t));
+    if (entries == NULL) {
+        ESP_LOGE(TAG, "registry: alloc failed");
+        return;
+    }
     size_t count = 0;
     esp_openthread_lock_acquire(portMAX_DELAY);
     registry_collect(entries, REGISTRY_MAX_DEVICES, &count);
     esp_openthread_lock_release();
 
     char *json = bridge_registry_to_json(entries, count);
+    free(entries);
     if (json == NULL) {
         return;
     }
