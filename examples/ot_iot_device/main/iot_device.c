@@ -177,7 +177,7 @@ static int coap_read_payload(otMessage *msg, char *buf, int buf_size) {
     return read;
 }
 
-// 解析 {"reqid":"..","cmd":"on|off|query"}。识别成功返回 true。
+// 解析 {"reqid":"..","cmd":"on|off|query|blink"}。识别成功返回 true。
 static bool parse_command(const char *json, char *reqid_out, size_t reqid_cap,
                           bool *on_out, bool *is_query_out, bool *is_blink_out) {
     cJSON *root = cJSON_Parse(json);

@@ -171,6 +171,10 @@ openspec archive <change-name>      # 或用 /opsx:archive
    路由和匹配。改命名规则=改契约(走流程 B)。
 6. **Thread router 数 ≠ SRP 注册数。** `dev/registry` 只含跑了 SRP 注册的设备
    (即 `ot_iot_device`),这是设计使然,不是 bug。
+7. **ESP32-H2-DevKitM-1 板载灯是 WS2812 可寻址 RGB(GPIO8),不是普通 GPIO 灯。**
+   `gpio_set_level()` 驱不动它——灯完全不亮且不报错。必须用 `led_strip` 组件
+   (RMT 时序):`led_strip_new_rmt_device` + `set_pixel/refresh`(亮)/`clear`(灭)。
+   依赖声明 `espressif/led_strip`。参考 `ot_iot_device/main/device_switch.c`。
 
 设备端更细的扩展陷阱见 `ot_iot_device/docs/DEVELOPMENT.md` 第 6 节。
 
