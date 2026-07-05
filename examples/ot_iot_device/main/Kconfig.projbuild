@@ -1,0 +1,37 @@
+menu "IoT Device Example"
+
+    config IOT_DEVICE_SWITCH_GPIO
+        int "Switch/LED GPIO number"
+        default 8
+        help
+            控制开关状态的 GPIO(接 LED 或继电器)。ESP32-H2 devkit 板载 LED 可用 8。
+
+    config IOT_DEVICE_SERVICE_NAME
+        string "SRP service name"
+        default "_iot._udp"
+        help
+            设备通过 SRP 注册的服务类型名。
+
+    config IOT_DEVICE_CTRL_URI
+        string "CoAP control resource path"
+        default "ctrl"
+        help
+            接收控制命令的 CoAP Uri-Path，必须与 BR 的 MQTT_OT_BRIDGE_COAP_URI 一致。
+
+    config IOT_DEVICE_ACK_URI
+        string "BR uplink resource path"
+        default "ack"
+        help
+            上报目标：BR 的 CoAP 资源，必须与 BR 的 MQTT_OT_BRIDGE_ACK_URI 一致。
+
+    config IOT_DEVICE_MULTICAST_ADDR
+        string "Multicast group to join"
+        default "ff03::1"
+        help
+            加入的组播组，必须与 BR 的 MQTT_OT_BRIDGE_MULTICAST_ADDR 一致。
+
+    config IOT_DEVICE_COAP_PORT
+        int "CoAP port"
+        default 5683
+
+endmenu
