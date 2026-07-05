@@ -79,6 +79,3 @@ void app_main(void)
 
     iot_device_start();
 }
-
-// 临时桩：Task 3 由 iot_device.c 提供真实实现(强符号覆盖)。
-__attribute__((weak)) void iot_device_start(void) {}
