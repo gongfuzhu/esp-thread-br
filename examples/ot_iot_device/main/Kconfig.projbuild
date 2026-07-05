@@ -34,4 +34,10 @@ menu "IoT Device Example"
         int "CoAP port"
         default 5683
 
+    config IOT_DEVICE_BLINK_MS
+        int "Blink duration (ms)"
+        default 500
+        help
+            控制设备LED闪烁的时长，单位为毫秒。
+
 endmenu
