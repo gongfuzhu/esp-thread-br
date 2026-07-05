@@ -148,6 +148,7 @@ static void blink_off_timer_cb(TimerHandle_t t) {
     esp_openthread_lock_acquire(portMAX_DELAY);
     device_switch_set(false);
     esp_openthread_lock_release();
+    ESP_LOGI(TAG, "blink: LED off");
 }
 
 // ---------------------------------------------------------------------------
