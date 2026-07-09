@@ -41,8 +41,8 @@
 
 ## 8. 验证
 
-- [ ] 8.1 在 ESP-IDF PowerShell/CMD 下 `idf.py set-target esp32h2 && idf.py build` 编译通过
-- [ ] 8.2 硬件联调:传感器触发(或手动拉高 GPIO8)→ 观察 monitor 打印 "Wake up from GPIO" 与上报日志 → 回深睡
-- [ ] 8.3 验证 MQTT `<prefix>/dev/response` 收到 `{"id":..,"reqid":..,"event":"motion"}`
-- [ ] 8.4 验证心跳:等待 `MOTION_HEARTBEAT_SEC` 后自动唤醒并上报 `event:"heartbeat"`
-- [ ] 8.5 验证兜底:断开 BR/网络,唤醒后在 `MOTION_MAX_AWAKE_MS` 内回深睡,不持续清醒
+- [x] 8.1 在 ESP-IDF PowerShell/CMD 下 `idf.py set-target esp32h2 && idf.py build` 编译通过
+- [x] 8.2 硬件联调:传感器触发(或手动拉高 GPIO8)→ 观察 monitor 打印 "Wake up from GPIO" 与上报日志 → 回深睡(monitor 实测:SRP found → `reported event=motion` → ~1s 后 Enter deep sleep,约 700ms 完成上报,从未触发兜底)
+- [ ] 8.3 验证 MQTT `<prefix>/dev/response` 收到 `{"id":..,"reqid":..,"event":"motion"}`(待验证:需订阅 broker 确认)
+- [ ] 8.4 验证心跳:等待 `MOTION_HEARTBEAT_SEC` 后自动唤醒并上报 `event:"heartbeat"`(待验证)
+- [ ] 8.5 验证兜底:断开 BR/网络,唤醒后在 `MOTION_MAX_AWAKE_MS` 内回深睡,不持续清醒(待验证)
