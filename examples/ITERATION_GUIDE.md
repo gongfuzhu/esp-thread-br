@@ -22,8 +22,16 @@
 不生成 ID。所有语义都是**服务端和设备两端约定**出来的——BR 只搬运字节。
 这是理解整个系统的钥匙,也是迭代时最容易违背的原则。
 
+**设备端有两种形态**,共用同一条 BR 透传管道:
+- **常驻控制型**(`ot_iot_device`):跑 CoAP server 收下行命令,执行后回执。双向。
+- **深睡上报型**(`deep_sleep`):无下行、无 CoAP server;被硬件事件/心跳**唤醒**后
+  入网→SRP 注册→单播 CoAP 上报事件到 BR `/ack`→回睡。**纯上行**。
+  新增 payload 字段 `event`(`motion`/`heartbeat`/`boot`),BR 原样透传到
+  `dev/response`——不改 BR 一行代码。
+
 完整设计与推理见归档的 OpenSpec change:
 `openspec/changes/archive/2026-07-05-add-mqtt-iot-bridge/`(proposal / design / specs)。
+深睡传感器变体见 `openspec/changes/archive/2026-07-09-add-motion-sensor/`。
 
 ---
 
@@ -34,7 +42,8 @@
 | 了解 BR 端配置与 topic 约定 | `common/mqtt_ot_bridge/README.md` |
 | 了解设备端使用与联调 | `ot_iot_device/README.md` |
 | **扩展设备功能**(加命令/换设备类型) | `ot_iot_device/docs/DEVELOPMENT.md` |
-| 系统正式契约(需求+场景) | `openspec/specs/{mqtt-bridge,coap-device-control,device-registry}/spec.md` |
+| **深睡传感器变体**(事件上报、运动唤醒) | `deep_sleep/README.md` |
+| 系统正式契约(需求+场景) | `openspec/specs/{mqtt-bridge,coap-device-control,device-registry,motion-event-report}/spec.md` |
 | 当初怎么设计的、为什么 | 归档 change 的 `design.md` |
 | 参考实现的任务拆解方式 | 归档 change 的 `tasks.md`、`docs/superpowers/plans/*.md` |
 | **本手册** | 顶层迭代流程 |
@@ -81,6 +90,9 @@ idf.py -p COM<x> flash monitor
 ```
 
 **判断口诀:** 如果你的改动会让"服务端或另一端必须跟着改才能对接",那就是契约变更 → 流程 B。
+
+> 已走过的两个流程 B 实例可参考:`add-mqtt-iot-bridge`(建立整套 topic/CoAP 契约)、
+> `add-motion-sensor`(新增 `event` payload 字段 + 深睡传感器设备形态)。
 
 ---
 
@@ -175,6 +187,17 @@ openspec archive <change-name>      # 或用 /opsx:archive
    `gpio_set_level()` 驱不动它——灯完全不亮且不报错。必须用 `led_strip` 组件
    (RMT 时序):`led_strip_new_rmt_device` + `set_pixel/refresh`(亮)/`clear`(灭)。
    依赖声明 `espressif/led_strip`。参考 `ot_iot_device/main/device_switch.c`。
+8. **深睡设备"上报后再睡"是时序竞态,不是固定延时。** 每次唤醒都是冷启动,必须
+   等 attach + SRP 注册完成(`otSrpClientGetServerAddress` 非 NULL)才能上报,否则
+   报文静默丢弃。触发上报的正确时机是 **SRP 自动启动回调**(拿到 BR 地址那一刻)。
+   NON 报文无 ACK,发出后用一个短 flush 定时器兜住发送再进睡;另设**最大清醒兜底
+   定时器**,attach 失败时到点强制回睡,避免空耗电。别再用"到 CHILD 后固定 5 秒即睡"
+   的老逻辑。参考 `deep_sleep/main/esp_ot_sleepy_device.c`。
+9. **深睡时内部上下拉不保持,悬空唤醒引脚会误唤醒。** EXT1 用 `ANY_HIGH` 时,RTC 外设
+   在深睡掉电,`gpio_pulldown_en` 的内部下拉**不生效**;引脚悬空会被拉高→睡下去立刻
+   又被唤醒→连报事件。推挽输出的 PIR/雷达空闲主动拉低,没问题;**开漏或悬空**必须加
+   **外部下拉电阻**(如 100kΩ 到 GND)。H2 的 EXT1 唤醒仅支持 RTC GPIO **8–14**
+   (GPIO7 是 RTC 但未引出,GPIO9 是 BOOT)。
 
 设备端更细的扩展陷阱见 `ot_iot_device/docs/DEVELOPMENT.md` 第 6 节。
 
