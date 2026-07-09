@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  emqx:
+    image: emqx/emqx:5.3.1
+    container_name: farmiot-emqx
+    restart: always
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "18083:18083"
+    volumes:
+      - emqx-data:/opt/emqx/data
+      - emqx-log:/opt/emqx/log
+    networks:
+      - farmiot-net
+
+  # 定时发送MQTT消息容器
+  mqtt-sender:
+    image: eclipse-mosquitto:2.0
+    container_name: farmiot-mqtt-sender
+    restart: always
+    networks:
+      - farmiot-net
+    command: >
+      sh -c '
+        while true; do
+          TS=$$(date +%s)000;
+          mosquitto_pub -h emqx -u gfz -P qwerasdf -t "otbr/cmd/unicast/744dbdfffe664fc4" -m "{\"reqid\":\"all\",\"cmd\":\"blink\",\"seq\":$$TS}";
+          sleep 5; # 间隔30秒发送一次
+        done
+      '
+
+volumes:
+  emqx-data:
+  emqx-log:
+
+networks:
+  farmiot-net:
+    driver: bridge
