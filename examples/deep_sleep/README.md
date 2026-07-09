@@ -5,9 +5,52 @@
 
 The example demonstrates the Thread Sleepy End Device (SED), the device will enter [Deep Sleep mode](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c6/api-reference/system/sleep_modes.html#sleep-modes) during idle state.
 
-This example is designed to address a specific deep sleep application scenario. First, it connects to the Thread network, and after 5 seconds when the state changes to CHILD, it enters deep sleep mode. There are two ways to wake up in this example: one is by using a 20-second periodic RTC timer, and the other is through GPIO input. Deep sleep is part of the upper-layer logic, and it's the user's responsibility to manage it in their own applications. If you need more wake-up methods, you can refer to the [Exapmle deep sleep](../../../system/deep_sleep/). Additionally, Espressif provides a stub for handling wake-ups, which allows for a quick check, and the user can decide whether to wake up or continue deep sleep in this stub, as explained in the [Example deep sleep stub](../../../system/deep_sleep_wake_stub).
+This example is designed to address a specific deep sleep application scenario. First, it connects to the Thread network, SRP-registers, and reports an event to the Border Router; once the report has been sent (or a max-awake fallback fires) it enters deep sleep mode. There are two ways to wake up in this example: one is by using a periodic RTC timer (heartbeat, `CONFIG_MOTION_HEARTBEAT_SEC`, default 300s), and the other is through a motion-sensor GPIO input (see [Motion Sensor Event Reporting](#motion-sensor-event-reporting) below). Deep sleep is part of the upper-layer logic, and it's the user's responsibility to manage it in their own applications. If you need more wake-up methods, you can refer to the [Exapmle deep sleep](../../../system/deep_sleep/). Additionally, Espressif provides a stub for handling wake-ups, which allows for a quick check, and the user can decide whether to wake up or continue deep sleep in this stub, as explained in the [Example deep sleep stub](../../../system/deep_sleep_wake_stub).
 
 Note: Implementing a standard Thread Sleepy Device is recommended using the [Light Sleep example](../light_sleep). Deep sleep triggers a reboot, and the device needs to undergo a re-attach process to rejoin the network. This means additional packet interactions are necessary after each wake-up from deep sleep. It can be advantageous in reducing power consumption, especially when the device remains in a sleep state for extended periods, such as more than 30 minutes.
+
+## Motion Sensor Event Reporting
+
+This variant adds a **motion sensor wake source**. When the sensor pulls the
+wakeup GPIO to 3.3 V, the device wakes from deep sleep, attaches to Thread,
+SRP-registers, and unicasts a CoAP NON POST to the BR `/ack` resource, which
+`mqtt_ot_bridge` forwards to MQTT `<prefix>/dev/response`. The device also
+wakes periodically (heartbeat) and on first boot.
+
+**Report payload:** `{"id":"<eui64>","reqid":"<8-hex>","event":"<event>"}`
+where `event` is one of `motion` (EXT1 wake), `heartbeat` (timer wake), or
+`boot` (power-on).
+
+### Wiring
+
+Three wires from the motion sensor (e.g. HC-SR501 PIR or RCWL-0516 radar):
+
+| Sensor | ESP32-H2 | Notes |
+| ------ | -------- | ----- |
+| VCC    | 3V3 / 5V | Per sensor module (PIR often 5 V). |
+| GND    | GND      | **Must share ground with the H2.** |
+| OUT    | GPIO8    | `CONFIG_MOTION_WAKEUP_GPIO`. Must be an H2 EXT1 RTC GPIO (8–14). |
+
+- The sensor OUT **high level must be 3.3 V** (not 5 V) — the H2 GPIO is not
+  5 V tolerant. Measure it before connecting.
+- Idle state must be **low** (wake is `ESP_EXT1_WAKEUP_ANY_HIGH`). Push-pull
+  PIR/radar outputs need no external resistor. An **open-drain** output floats
+  when idle and requires an external pull-down (e.g. 100 kΩ to GND).
+
+### Configuration (`idf.py menuconfig` → "Deep Sleep Motion Sensor")
+
+| Symbol | Default | Meaning |
+| ------ | ------- | ------- |
+| `MOTION_WAKEUP_GPIO` | 8 | Sensor OUT pin (H2 EXT1 range 8–14). |
+| `MOTION_HEARTBEAT_SEC` | 300 | Heartbeat wake interval. |
+| `MOTION_MAX_AWAKE_MS` | 10000 | Force sleep if attach/report never completes. |
+| `MOTION_SRP_SERVICE_NAME` | `_iot._udp` | Must match BR `mqtt_ot_bridge`. |
+| `MOTION_ACK_URI` | `ack` | Must match BR `MQTT_OT_BRIDGE_ACK_URI`. |
+| `MOTION_COAP_PORT` | 5683 | Must match BR `mqtt_ot_bridge`. |
+
+> The `ACK_URI`, CoAP port, and SRP service name **must match the BR's
+> `mqtt_ot_bridge` configuration**, or reports will not reach MQTT.
+
 ## How to use example
 
 ### Hardware Required

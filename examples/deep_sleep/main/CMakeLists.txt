@@ -1,3 +1,3 @@
-idf_component_register(SRCS "esp_ot_sleepy_device.c"
-                       PRIV_REQUIRES esp_event esp_timer openthread nvs_flash
+idf_component_register(SRCS "esp_ot_sleepy_device.c" "device_eui64.c"
+                       PRIV_REQUIRES esp_event esp_timer openthread nvs_flash driver esp_hw_support
                        INCLUDE_DIRS ".")
