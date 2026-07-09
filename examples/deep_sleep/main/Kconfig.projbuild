@@ -1,0 +1,42 @@
+menu "Deep Sleep Motion Sensor"
+
+    config MOTION_WAKEUP_GPIO
+        int "Motion sensor wakeup GPIO"
+        default 8
+        help
+            运动传感器 3.3V 输出接入的 GPIO。EXT1 深睡唤醒仅支持 RTC GPIO,
+            ESP32-H2 合法范围为 8-14(GPIO7 虽是 RTC 但未引出,GPIO9 为 BOOT)。
+            唤醒条件为高电平(检测到运动=3.3V)。
+
+    config MOTION_HEARTBEAT_SEC
+        int "Heartbeat wakeup interval (seconds)"
+        default 300
+        help
+            RTC 定时器唤醒间隔,作为周期性"存活"心跳上报。
+
+    config MOTION_MAX_AWAKE_MS
+        int "Max awake fallback (ms)"
+        default 10000
+        help
+            唤醒后最大清醒兜底毫秒数。无论上报是否成功,到点强制回深睡,
+            防止 attach/上报失败时无限清醒耗电。
+
+    config MOTION_SRP_SERVICE_NAME
+        string "SRP service name"
+        default "_iot._udp"
+        help
+            通过 SRP 注册的服务类型名,须与 BR mqtt_ot_bridge 约定一致。
+
+    config MOTION_ACK_URI
+        string "BR uplink CoAP resource path"
+        default "ack"
+        help
+            上报目标:BR 的 CoAP 资源,必须与 BR 的 MQTT_OT_BRIDGE_ACK_URI 一致。
+
+    config MOTION_COAP_PORT
+        int "CoAP port"
+        default 5683
+        help
+            CoAP 端口,须与 BR mqtt_ot_bridge 一致。
+
+endmenu
