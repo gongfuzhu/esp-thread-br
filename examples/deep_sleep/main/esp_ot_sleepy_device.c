@@ -25,6 +25,17 @@
 #include "esp_vfs_eventfd.h"
 #include "nvs_flash.h"
 #include "driver/rtc_io.h"
+#include "esp_random.h"
+#include "esp_openthread_lock.h"
+#include "device_eui64.h"
+#include "openthread/instance.h"
+#include "openthread/thread.h"
+#include "openthread/srp_client.h"
+#include "openthread/srp_client_buffers.h"
+#include "openthread/platform/radio.h"
+#include "openthread/coap.h"
+#include "openthread/message.h"
+#include "openthread/ip6.h"
 
 #if !SOC_IEEE802154_SUPPORTED
 #error "Openthread sleepy device is only supported for the SoCs which have IEEE 802.15.4 module"
@@ -34,6 +45,10 @@
 
 static RTC_DATA_ATTR struct timeval s_sleep_enter_time;
 static esp_timer_handle_t s_max_awake_timer;
+
+// 上报发出后等待 radio flush 再进深睡的时长。NON 报文无 ACK,故用固定短延时兜住发送。
+#define REPORT_FLUSH_MS 1000
+static esp_timer_handle_t s_flush_timer;
 
 // 本次唤醒对应的事件类型,由唤醒原因映射而来。Task 3 上报时读取。
 static const char *s_event = "boot";
@@ -76,6 +91,13 @@ static void max_awake_timer_cb(void *arg)
     enter_deep_sleep();
 }
 
+// 上报发出后经短暂 flush 延时再进深睡。
+static void flush_timer_cb(void *arg)
+{
+    (void)arg;
+    enter_deep_sleep();
+}
+
 static void ot_deep_sleep_init(void)
 {
     // 打印唤醒原因,并据此确定本次事件类型 s_event。
@@ -114,6 +136,107 @@ static void ot_deep_sleep_init(void)
     ESP_ERROR_CHECK(gpio_pullup_dis(gpio_wakeup_pin));
 }
 
+// 调用者必须已持 OT 锁。以 EUI64 为 host/instance 名做 SRP 自动注册。
+static void srp_register(otInstance *inst)
+{
+    uint8_t eui[8];
+    otPlatRadioGetIeeeEui64(inst, eui);
+    device_eui64_to_string(eui, s_eui64_str);
+
+    uint16_t size = 0;
+    char *host_name_buf = otSrpClientBuffersGetHostNameString(inst, &size);
+    strncpy(host_name_buf, s_eui64_str, size - 1);
+    host_name_buf[size - 1] = '\0';
+    otSrpClientSetHostName(inst, host_name_buf);
+    otSrpClientEnableAutoHostAddress(inst);
+
+    otSrpClientBuffersServiceEntry *entry = otSrpClientBuffersAllocateService(inst);
+    if (entry == NULL) {
+        ESP_LOGE(TAG, "SRP buffer alloc failed");
+        return;
+    }
+    char *inst_name = otSrpClientBuffersGetServiceEntryInstanceNameString(entry, &size);
+    strncpy(inst_name, s_eui64_str, size - 1);
+    inst_name[size - 1] = '\0';
+
+    char *svc_name = otSrpClientBuffersGetServiceEntryServiceNameString(entry, &size);
+    strncpy(svc_name, CONFIG_MOTION_SRP_SERVICE_NAME, size - 1);
+    svc_name[size - 1] = '\0';
+
+    entry->mService.mPort = CONFIG_MOTION_COAP_PORT;
+
+    otError err = otSrpClientAddService(inst, &entry->mService);
+    if (err != OT_ERROR_NONE) {
+        ESP_LOGE(TAG, "SRP add service err=%d", err);
+        return;
+    }
+    ESP_LOGI(TAG, "SRP registration queued: host/instance=%s service=%s",
+             s_eui64_str, CONFIG_MOTION_SRP_SERVICE_NAME);
+}
+
+// 构造事件 JSON 并单播 NON POST 到 BR(SRP server)的 /ack 资源。
+// 调用者必须已持 OT 锁。返回是否成功交给发送。
+static bool device_report(otInstance *inst, const char *event)
+{
+    const otSockAddr *server = otSrpClientGetServerAddress(inst);
+    if (server == NULL) {
+        ESP_LOGW(TAG, "report: no SRP server address yet");
+        return false;
+    }
+
+    char json[128];
+    unsigned reqid = esp_random();
+    int n = snprintf(json, sizeof(json),
+                     "{\"id\":\"%s\",\"reqid\":\"%08x\",\"event\":\"%s\"}",
+                     s_eui64_str, reqid, event);
+    if (n <= 0 || n >= (int)sizeof(json)) {
+        ESP_LOGE(TAG, "report: json build failed");
+        return false;
+    }
+
+    otMessage *msg = otCoapNewMessage(inst, NULL);
+    if (msg == NULL) {
+        return false;
+    }
+    otCoapMessageInit(msg, OT_COAP_TYPE_NON_CONFIRMABLE, OT_COAP_CODE_POST);
+    otCoapMessageAppendUriPathOptions(msg, CONFIG_MOTION_ACK_URI);
+    otCoapMessageSetPayloadMarker(msg);
+    otMessageAppend(msg, json, (uint16_t)strlen(json));
+
+    otMessageInfo info;
+    memset(&info, 0, sizeof(info));
+    info.mPeerAddr = server->mAddress;
+    info.mPeerPort = CONFIG_MOTION_COAP_PORT;
+
+    otError err = otCoapSendRequest(inst, msg, &info, NULL, NULL);
+    if (err != OT_ERROR_NONE) {
+        otMessageFree(msg);
+        ESP_LOGE(TAG, "report send err=%d", err);
+        return false;
+    }
+    ESP_LOGI(TAG, "reported event=%s reqid=%08x", event, reqid);
+    return true;
+}
+
+// SRP 自动启动回调:发现 server(即拿到 BR 地址)后上报事件并排定进睡。
+// 在 OpenThread 任务上下文调用(已持锁)。
+static void srp_autostart_cb(const otSockAddr *server, void *ctx)
+{
+    (void)ctx;
+    if (server == NULL) {
+        // server 停止,忽略。
+        return;
+    }
+    otInstance *inst = esp_openthread_get_instance();
+    ESP_LOGI(TAG, "SRP auto-start: server found, host=%s", s_eui64_str);
+
+    if (device_report(inst, s_event)) {
+        // 报文已交给发送:等待短暂 flush 后进深睡。
+        esp_timer_start_once(s_flush_timer, (uint64_t)REPORT_FLUSH_MS * 1000ULL);
+    }
+    // 若发送失败,依赖 Task 2 的 max-awake 兜底定时器进深睡。
+}
+
 void app_main(void)
 {
     // Used eventfds:
@@ -138,6 +261,12 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_timer_create(&max_awake_timer_args, &s_max_awake_timer));
     ESP_ERROR_CHECK(esp_timer_start_once(s_max_awake_timer, (uint64_t)CONFIG_MOTION_MAX_AWAKE_MS * 1000ULL));
 
+    const esp_timer_create_args_t flush_timer_args = {
+        .callback = &flush_timer_cb,
+        .name = "report-flush",
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&flush_timer_args, &s_flush_timer));
+
     static esp_openthread_config_t config = {
         .netif_config = ESP_NETIF_DEFAULT_OPENTHREAD(),
         .platform_config = {
@@ -150,4 +279,15 @@ void app_main(void)
     esp_netif_set_default_netif(esp_openthread_get_netif());
 
     create_config_network(esp_openthread_get_instance());
+
+    // SRP 注册 + CoAP 客户端启动 + 注册自动启动回调(server 找到即上报)。
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *inst = esp_openthread_get_instance();
+    otError coap_err = otCoapStart(inst, CONFIG_MOTION_COAP_PORT);
+    if (coap_err != OT_ERROR_NONE) {
+        ESP_LOGE(TAG, "CoAP start err=%d", coap_err);
+    }
+    srp_register(inst);
+    otSrpClientEnableAutoStartMode(inst, srp_autostart_cb, NULL);
+    esp_openthread_lock_release();
 }
