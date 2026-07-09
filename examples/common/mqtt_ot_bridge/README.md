@@ -2,6 +2,9 @@
 
 BR 侧的无状态 MQTT↔CoAP 桥接组件。把局域网 MQTT 命令翻译为对 Thread 网内设备的 CoAP 请求,并把设备响应与 SRP 设备清单发布回 MQTT。
 
+> **后端/服务端对接**请看 [`docs/MQTT_API.md`](docs/MQTT_API.md)——含 topic 总表、
+> 各 payload 字段与示例、reqid 对账流程。本 README 侧重 BR 固件配置与设备端契约。
+
 ## BR 配置(menuconfig → MQTT OT Bridge)
 - `MQTT_OT_BRIDGE_ENABLE`：启用桥接
 - `MQTT_OT_BRIDGE_BROKER_URI`：`mqtt://host:port`(局域网，无 TLS)

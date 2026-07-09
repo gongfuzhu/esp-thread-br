@@ -40,6 +40,7 @@
 | 你想做的事 | 看这个 |
 |-----------|--------|
 | 了解 BR 端配置与 topic 约定 | `common/mqtt_ot_bridge/README.md` |
+| **后端对接 MQTT**(topic/payload/示例) | `common/mqtt_ot_bridge/docs/MQTT_API.md` |
 | 了解设备端使用与联调 | `ot_iot_device/README.md` |
 | **扩展设备功能**(加命令/换设备类型) | `ot_iot_device/docs/DEVELOPMENT.md` |
 | **深睡传感器变体**(事件上报、运动唤醒) | `deep_sleep/README.md` |
