@@ -108,6 +108,12 @@ void app_main(void)
     launch_openthread_border_router(&openthread_config, &rcp_update_config);
 
 #if CONFIG_MQTT_OT_BRIDGE_ENABLE
-    ESP_ERROR_CHECK(mqtt_ot_bridge_start());
+    // MQTT 桥接是附属功能：启动失败(如 broker 不可达、证书问题)只记日志，
+    // 不得 abort，以免拖垮 Thread/BR 核心网络功能。
+    esp_err_t mqtt_err = mqtt_ot_bridge_start();
+    if (mqtt_err != ESP_OK) {
+        ESP_LOGE(TAG, "mqtt_ot_bridge_start failed: %s (BR continues without MQTT bridge)",
+                 esp_err_to_name(mqtt_err));
+    }
 #endif
 }
