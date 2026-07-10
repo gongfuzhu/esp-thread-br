@@ -277,11 +277,23 @@ static void wifi_config_stop_softap(void)
 
     esp_wifi_stop();
 
-    /* Always restore STA mode rather than calling esp_wifi_deinit(). If we deinit here, the
-     * managed component's s_wifi_initialized flag remains true, causing the next
-     * esp_ot_wifi_connect() to skip example_wifi_start() and fail with ESP_ERR_WIFI_NOT_INIT. */
-    esp_wifi_set_mode(WIFI_MODE_STA);
-    esp_wifi_start();
+    /* Align the IDF Wi-Fi driver state with whether the STA side has been initialized.
+     * The STA netif ("WIFI_STA_DEF") is created only by example_wifi_start(); the SoftAP
+     * path here creates just the AP netif. So the STA netif's existence tells us which
+     * teardown is correct without reaching into another component's private state:
+     *
+     * - No STA netif (auto-start provisioning): the SoftAP path called esp_wifi_init()
+     *   but example_wifi_start() never ran. Deinit the driver so the subsequent
+     *   esp_ot_wifi_connect() -> example_wifi_start() can initialize cleanly (create the
+     *   STA netif) instead of aborting on ESP_ERR_INVALID_STATE (double esp_wifi_init).
+     * - STA netif exists (CLI `wifi connect` path): keep the driver initialized and
+     *   restore STA mode; deinit here would make the next connect fail with ESP_ERR_WIFI_NOT_INIT. */
+    if (esp_netif_get_handle_from_ifkey("WIFI_STA_DEF") == NULL) {
+        esp_wifi_deinit();
+    } else {
+        esp_wifi_set_mode(WIFI_MODE_STA);
+        esp_wifi_start();
+    }
 
     if (s_ap_netif) {
         esp_netif_destroy(s_ap_netif);
