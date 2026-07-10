@@ -13,7 +13,8 @@ menu "MQTT OT Bridge"
             string "MQTT broker URI"
             default "mqtt://192.168.1.100:1883"
             help
-                局域网 broker 地址，形如 mqtt://host:port(不使用 TLS)。
+                broker 地址。mqtt://host:port 为明文；mqtts://host:port 启用 TLS,
+                此时用组件内嵌入的 CA 证书(certs/mqtt_ca_cert.pem)校验服务器证书。
 
         config MQTT_OT_BRIDGE_USERNAME
             string "MQTT username"
