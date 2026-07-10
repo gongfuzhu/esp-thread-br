@@ -20,6 +20,10 @@
 
 #define TAG "mqtt_ot_bridge"
 
+// TLS CA 证书（由组件 CMakeLists.txt 的 EMBED_TXTFILES 嵌入）
+extern const uint8_t mqtt_ca_cert_pem_start[] asm("_binary_mqtt_ca_cert_pem_start");
+extern const uint8_t mqtt_ca_cert_pem_end[]   asm("_binary_mqtt_ca_cert_pem_end");
+
 #define REGISTRY_MAX_DEVICES 32
 #define COAP_PAYLOAD_MAX     512
 
@@ -354,6 +358,9 @@ esp_err_t mqtt_ot_bridge_start(void) {
 
     esp_mqtt_client_config_t cfg = {
         .broker.address.uri = CONFIG_MQTT_OT_BRIDGE_BROKER_URI,
+        // mqtts:// 时用嵌入的 CA 校验服务器证书；mqtt:// 时 esp-mqtt 忽略此字段（明文向后兼容）
+        .broker.verification.certificate = (const char *)mqtt_ca_cert_pem_start,
+        .broker.verification.certificate_len = mqtt_ca_cert_pem_end - mqtt_ca_cert_pem_start,
         .credentials.username = CONFIG_MQTT_OT_BRIDGE_USERNAME,
         .credentials.authentication.password = CONFIG_MQTT_OT_BRIDGE_PASSWORD,
     };
