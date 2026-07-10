@@ -106,8 +106,12 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 CONFIG_OPENTHREAD_BR_START_WEB=y
 # Auto-connect Wi-Fi and form Thread network on boot
 CONFIG_OPENTHREAD_BR_AUTO_START=y
-# SoftAP fallback provisioning (http://192.168.4.1) when no Wi-Fi credentials
-CONFIG_OPENTHREAD_BR_SOFTAP_SETUP=y
+# SoftAP fallback provisioning is DISABLED: when =y it fully replaces the
+# EXAMPLE_WIFI_SSID preset path (they are compile-time exclusive in
+# border_router_launch.c ot_br_init), so with no NVS credentials the device
+# would wait forever on the SoftAP web page instead of using the preset SSID.
+# Keep =n so a blank-NVS device auto-connects with EXAMPLE_WIFI_SSID/PASSWORD.
+# CONFIG_OPENTHREAD_BR_SOFTAP_SETUP is not set
 # end of ESP Thread Border Router board / RCP wiring
 
 #
