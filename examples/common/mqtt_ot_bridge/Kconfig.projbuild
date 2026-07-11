@@ -52,7 +52,7 @@ menu "MQTT OT Bridge"
 
         config MQTT_OT_BRIDGE_REGISTRY_INTERVAL_S
             int "Device registry publish interval (seconds)"
-            default 30
+            default 3600
             range 5 3600
 
     endif
