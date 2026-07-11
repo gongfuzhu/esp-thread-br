@@ -271,7 +271,7 @@ static void handle_downlink(const char *topic_suffix, const char *data, int data
     if (cmd.kind == BRIDGE_CMD_UNICAST) {
         otIp6Address dst;
         if (bridge_lookup_ipv6_by_eui64(cmd.eui64, &dst)) {
-            // 单播也用 NON：回执统一走设备 → /ack → dev/response，由服务端凭 reqid 对账。
+            // 单播也用 NON：回执统一走设备 → /ack → cmd/resp，由服务端凭 reqid 对账。
             // 若用 CON 而设备不回 CoAP ACK，会触发 BR 重传，导致设备重复执行与重复上报。
             coap_send(&dst, false, data, data_len);
         } else {
