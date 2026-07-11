@@ -13,7 +13,7 @@ test_envelope: test_envelope.c $(SRC)/iot_envelope.c
 	$(CC) $(CFLAGS) $(CJSON_CFLAGS) -o $@ $^ $(CJSON_LIBS)
 
 test_dispatch: test_dispatch.c $(SRC)/iot_dispatch.c
-	$(CC) $(CFLAGS) $(CJSON_CFLAGS) -o $@ $^ $(CJSON_LIBS)
+	$(CC) $(CFLAGS) $(CJSON_CFLAGS) -I../../include -o $@ $^ $(CJSON_LIBS)
 
 clean:
 	rm -f test_envelope test_dispatch
