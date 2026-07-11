@@ -32,9 +32,3 @@
 #### Scenario: 组播上报加抖动
 - **WHEN** 命令经组播(本地收包地址为多播)下发并被执行
 - **THEN** 设备在 0~500ms 随机抖动后再上报
-
-## REMOVED Requirements
-
-### Requirement: blink 命令执行（旧 cmd 协议）
-**Reason**: 旧 `{reqid,cmd:"blink"}` 简化协议被 `物联网IoT指令响应协议规范` 的 `{reqid,event,data}` 统一信封取代，blink 语义并入 `switch` event 的 `hold` 参数。
-**Migration**: 云端将 `{"cmd":"blink"}` 改为 `{"event":"switch","data":{"gpio":<led>,"action":"on","hold":<ms>}}`；`{"cmd":"on/off"}` 改为 `{"event":"switch","data":{"gpio":<led>,"action":"on/off"}}`；`{"cmd":"query"}` 由响应信封回显状态承载。
