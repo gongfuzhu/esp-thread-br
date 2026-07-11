@@ -14,6 +14,8 @@
 #include "openthread/message.h"
 #include "openthread/ip6.h"
 #include "openthread/srp_server.h"
+#include "openthread/platform/radio.h"
+#include "cJSON.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
@@ -46,12 +48,28 @@ static const char *topic_suffix_after_prefix(const char *topic) {
     return cmd + strlen("/cmd/");
 }
 
+// BR 自身 EUI64(小写十六进制)。懒初始化，须已持 OT 锁调用。
+static const char *br_eui64_str(void) {
+    static char s[17] = {0};
+    if (s[0] == '\0') {
+        uint8_t eui[8];
+        otPlatRadioGetIeeeEui64(esp_openthread_get_instance(), eui);
+        static const char *hexd = "0123456789abcdef";
+        for (int i = 0; i < 8; i++) {
+            s[i*2]   = hexd[(eui[i] >> 4) & 0xf];
+            s[i*2+1] = hexd[eui[i] & 0xf];
+        }
+        s[16] = '\0';
+    }
+    return s;
+}
+
 static void publish_uplink(const char *payload, int len) {
     if (s_client == NULL) {
         return;
     }
     char t[128];
-    snprintf(t, sizeof(t), "%s/dev/response", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
+    snprintf(t, sizeof(t), "%s/cmd/resp", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
     esp_mqtt_client_publish(s_client, t, payload, len, 0, 0);
 }
 
@@ -302,6 +320,40 @@ static void publish_registry(void) {
     free(json);
 }
 
+// 解析 cmd/registry 上的 registry_list 指令，查 SRP 表并发布响应到 cmd/resp。
+static void handle_registry_cmd(const char *data, int data_len) {
+    // 取 reqid(可选)
+    char reqid[64] = "";
+    cJSON *root = cJSON_ParseWithLength(data, data_len);
+    if (root != NULL) {
+        cJSON *jr = cJSON_GetObjectItem(root, "reqid");
+        if (cJSON_IsString(jr) && jr->valuestring) {
+            strncpy(reqid, jr->valuestring, sizeof(reqid) - 1);
+            reqid[sizeof(reqid) - 1] = '\0';
+        }
+        cJSON_Delete(root);
+    }
+
+    bridge_dev_entry_t *entries = calloc(REGISTRY_MAX_DEVICES, sizeof(bridge_dev_entry_t));
+    if (entries == NULL) { ESP_LOGE(TAG, "registry cmd: alloc failed"); return; }
+    size_t count = 0;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    registry_collect(entries, REGISTRY_MAX_DEVICES, &count);
+    const char *br_eui = br_eui64_str();
+    esp_openthread_lock_release();
+
+    char *json = bridge_registry_list_resp_to_json(reqid, br_eui, entries, count);
+    free(entries);
+    if (json == NULL) return;
+    if (s_client != NULL) {
+        char t[128];
+        snprintf(t, sizeof(t), "%s/cmd/resp", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
+        esp_mqtt_client_publish(s_client, t, json, 0, 0, 0);
+        ESP_LOGI(TAG, "registry_list answered: %d devices", (int)count);
+    }
+    free(json);
+}
+
 static void registry_timer_cb(TimerHandle_t t) {
     (void)t;
     publish_registry();
@@ -316,6 +368,8 @@ static void subscribe_all(esp_mqtt_client_handle_t client) {
     snprintf(t, sizeof(t), "%s/cmd/unicast/+", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
     esp_mqtt_client_subscribe(client, t, 0);
     snprintf(t, sizeof(t), "%s/cmd/multicast", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
+    esp_mqtt_client_subscribe(client, t, 0);
+    snprintf(t, sizeof(t), "%s/cmd/registry", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
     esp_mqtt_client_subscribe(client, t, 0);
     ESP_LOGI(TAG, "subscribed under prefix '%s'", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
 }
@@ -337,7 +391,11 @@ static void mqtt_event_handler(void *args, esp_event_base_t base, int32_t event_
         topic[tlen] = '\0';
         const char *suffix = topic_suffix_after_prefix(topic);
         if (suffix != NULL) {
-            handle_downlink(suffix, event->data, event->data_len);
+            if (strcmp(suffix, "registry") == 0) {
+                handle_registry_cmd(event->data, event->data_len);
+            } else {
+                handle_downlink(suffix, event->data, event->data_len);
+            }
         }
         break;
     }
