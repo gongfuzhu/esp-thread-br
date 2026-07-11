@@ -1,0 +1,6 @@
+version: "1.0.0"
+description: "ADC read capability component for IoT device core"
+url: "https://github.com/espressif/esp-thread-br"
+dependencies:
+  espressif/cjson: "^1.7.19"
+  idf: ">=5.1.0"
