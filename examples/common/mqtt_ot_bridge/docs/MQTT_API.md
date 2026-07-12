@@ -173,6 +173,28 @@ blink 回执示例(固定 `state:"off"` + `action:"blink"`):
 > **区分设备类型**:后端可凭 payload 有无 `event` 字段区分"传感器上报"与"控制回执";
 > 或结合 `dev/registry` 的 `service` 字段。
 
+### 上行·主动上报 `<prefix>/dev/up`
+
+设备**主动**上报的事件(motion/boot/heartbeat 等,无对应下行命令)由 BR 的
+`devup` CoAP 资源接收后原样发布到此 topic。与 `cmd/resp`(对下行命令的应答)
+按 **CoAP 接收资源** 分流,BR 不解析 payload。
+
+信封(与 IoT 组件同构):
+
+```json
+{ "reqid": "e2664224", "eui64": "744dbdfffe664fc4", "event": "motion", "data": {} }
+```
+
+| 字段 | 含义 |
+|---|---|
+| `reqid` | 设备自生成的 8 位十六进制随机值(每次上报唯一,用于去重) |
+| `eui64` | 设备唯一 ID(16 位小写 hex) |
+| `event` | 事件类型:`motion` / `boot` / `heartbeat` |
+| `data` | 事件数据对象(当前为空占位,预留传感器读数等) |
+
+> topic 语义划分:`cmd/resp` = 对下行命令的应答(带 `code`/`msg`);
+> `dev/up` = 设备主动上报(无对应下行命令)。
+
 ---
 
 ## 6. reqid 对账(后端职责)
