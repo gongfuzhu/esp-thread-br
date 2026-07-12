@@ -187,8 +187,8 @@ static bool device_report(otInstance *inst, const char *event)
     char json[128];
     unsigned reqid = esp_random();
     int n = snprintf(json, sizeof(json),
-                     "{\"id\":\"%s\",\"reqid\":\"%08x\",\"event\":\"%s\"}",
-                     s_eui64_str, reqid, event);
+                     "{\"reqid\":\"%08x\",\"eui64\":\"%s\",\"event\":\"%s\",\"data\":{}}",
+                     reqid, s_eui64_str, event);
     if (n <= 0 || n >= (int)sizeof(json)) {
         ESP_LOGE(TAG, "report: json build failed");
         return false;
