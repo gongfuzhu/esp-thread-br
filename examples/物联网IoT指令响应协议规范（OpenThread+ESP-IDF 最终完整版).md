@@ -18,6 +18,10 @@
 用途：全网设备批量控制、统一全局配置、广播指令下发
       
 
+- **设备注册查询下行（云端→BR）**：`otbr/cmd/registry`
+用途：查询组网已注册设备列表（`registry_list`）。该主题为 BR 专用指令通道，由 **BR 直接查询本地 SRP 注册表并应答**，不转发给终端设备；应答仍发布到 `otbr/cmd/resp`。这是全网唯一由 BR 自解析、自应答的主题（因为只有 BR 能观察 SRP 表），其余 `cmd/unicast`、`cmd/multicast` 主题 BR 一律字节透传不解析。
+      
+
 - **设备响应上行（设备→云端）**：`otbr/cmd/resp`
 用途：所有指令执行回执、数据查询应答，所有 `xxx_resp` 响应统一上报此主题
 
@@ -91,7 +95,9 @@
 
 ### 4\.1 查询组网注册设备 registry\_list
 
-**下行指令**
+**路由说明**：下行指令必须发布到专用主题 `otbr/cmd/registry`（非 `cmd/unicast`/`cmd/multicast`）；由 BR 查询本地 SRP 注册表直接应答，响应发布到 `otbr/cmd/resp`，`reqid` 与下行一致。
+
+**下行指令**（发布到 `otbr/cmd/registry`）
 
 ```Plain Text
 {
