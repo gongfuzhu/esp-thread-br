@@ -1,0 +1,31 @@
+menu "IoT Device Core"
+
+    config IOT_CORE_SERVICE_NAME
+        string "SRP service name"
+        default "_iot._udp"
+
+    config IOT_CORE_CTRL_URI
+        string "CoAP control resource path"
+        default "ctrl"
+
+    config IOT_CORE_ACK_URI
+        string "BR uplink resource path"
+        default "ack"
+
+    config IOT_CORE_MULTICAST_ADDR
+        string "Multicast group to join"
+        default "ff03::1"
+
+    config IOT_CORE_COAP_PORT
+        int "CoAP port"
+        default 5683
+
+    config IOT_CORE_WORKER_STACK
+        int "Command worker task stack size (bytes)"
+        default 4096
+
+    config IOT_CORE_WORKER_QUEUE_LEN
+        int "Command worker queue length"
+        default 8
+
+endmenu

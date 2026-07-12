@@ -33,7 +33,10 @@
 #include "esp_ot_cli_extension.h"
 #endif
 
-#include "iot_device.h"
+#include "iot_device_core.h"
+#include "iot_cap_switch.h"
+#include "iot_cap_pwm_set.h"
+#include "iot_cap_adc_read.h"
 
 #define TAG "ot_iot_device"
 
@@ -77,5 +80,8 @@ void app_main(void)
     ot_network_auto_start();
 #endif
 
-    iot_device_start();
+    iot_device_core_start();
+    iot_cap_switch_init();
+    iot_cap_pwm_set_init();
+    iot_cap_adc_read_init();
 }

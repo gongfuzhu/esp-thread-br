@@ -46,13 +46,21 @@ menu "MQTT OT Bridge"
             help
                 BR 侧接收设备主动上报的 CoAP 资源 Uri-Path。
 
+        config MQTT_OT_BRIDGE_DEVUP_URI
+            string "CoAP uplink resource path for device-initiated reports"
+            default "devup"
+            help
+                BR 侧接收设备主动上报(motion/boot/heartbeat 等)的 CoAP 资源
+                Uri-Path，发布到 <prefix>/dev/up。与命令响应资源
+                MQTT_OT_BRIDGE_ACK_URI(-> cmd/resp)分离。
+
         config MQTT_OT_BRIDGE_COAP_PORT
             int "CoAP port"
             default 5683
 
         config MQTT_OT_BRIDGE_REGISTRY_INTERVAL_S
             int "Device registry publish interval (seconds)"
-            default 30
+            default 3600
             range 5 3600
 
     endif

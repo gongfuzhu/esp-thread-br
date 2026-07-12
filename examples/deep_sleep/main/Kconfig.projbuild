@@ -29,9 +29,9 @@ menu "Deep Sleep Motion Sensor"
 
     config MOTION_ACK_URI
         string "BR uplink CoAP resource path"
-        default "ack"
+        default "devup"
         help
-            上报目标:BR 的 CoAP 资源,必须与 BR 的 MQTT_OT_BRIDGE_ACK_URI 一致。
+            上报目标:BR 的 CoAP 资源,设为 devup 以发布到 MQTT dev/up 主题。
 
     config MOTION_COAP_PORT
         int "CoAP port"

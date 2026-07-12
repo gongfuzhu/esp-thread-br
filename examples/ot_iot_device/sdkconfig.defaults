@@ -1,42 +1,110 @@
+# This file was generated using idf.py save-defconfig or menuconfig [D] key. It can be edited manually.
+# Espressif IoT Development Framework (ESP-IDF) 6.0.2 Project Minimal Configuration
+#
+# default:
+CONFIG_IDF_TARGET="esp32h2"
+
 #
 # Partition Table
 #
 CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
-CONFIG_PARTITION_TABLE_OFFSET=0x8000
-CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# mbedTLS
+# Config for OpenThread Examples
 #
-CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
-CONFIG_MBEDTLS_KEY_EXCHANGE_ECJPAKE=y
-CONFIG_MBEDTLS_ECJPAKE_C=y
-# end of mbedTLS
+CONFIG_OPENTHREAD_NETWORK_AUTO_START=y
+# end of Config for OpenThread Examples
 
 #
-# OpenThread
+# OpenThread Device Role Indicator
 #
-CONFIG_OPENTHREAD_ENABLED=y
-CONFIG_OPENTHREAD_BORDER_ROUTER=n
-CONFIG_OPENTHREAD_DNS64_CLIENT=y
-CONFIG_OPENTHREAD_TASK_SIZE=10240
-CONFIG_OPENTHREAD_CONSOLE_ENABLE=n
-# end of OpenThread
+CONFIG_OPENTHREAD_STATE_INDICATOR_ENABLE=y
+# end of OpenThread Device Role Indicator
 
 #
-# lwIP
+# Component config
 #
-CONFIG_LWIP_TCPIP_TASK_STACK_SIZE=4096
-CONFIG_LWIP_IPV6_NUM_ADDRESSES=8
-CONFIG_LWIP_MULTICAST_PING=y
-CONFIG_LWIP_HOOK_IP6_SELECT_SRC_ADDR_CUSTOM=y
-# end of lwIP
+
+#
+# ESP PSRAM
+#
 
 #
 # ESP System Settings
 #
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
 # end of ESP System Settings
+
+#
+# LWIP
+#
+CONFIG_LWIP_IPV6_NUM_ADDRESSES=8
+CONFIG_LWIP_TCPIP_TASK_STACK_SIZE=4096
+
+#
+# ICMP
+#
+CONFIG_LWIP_MULTICAST_PING=y
+# end of ICMP
+
+#
+# Hooks
+#
+CONFIG_LWIP_HOOK_IP6_SELECT_SRC_ADDR_CUSTOM=y
+# end of Hooks
+# end of LWIP
+
+#
+# mbedTLS
+#
+
+#
+# TLS Protocol Configuration
+#
+
+#
+# TLS Key Exchange Configuration
+#
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECJPAKE=y
+# end of TLS Key Exchange Configuration
+# end of TLS Protocol Configuration
+
+CONFIG_MBEDTLS_SSL_PROTO_DTLS=y
+
+#
+# Asymmetric Ciphers
+#
+
+#
+# Elliptic Curve Ciphers Configuration
+#
+CONFIG_MBEDTLS_ECJPAKE_C=y
+# end of Elliptic Curve Ciphers Configuration
+# end of Asymmetric Ciphers
+# end of mbedTLS
+
+#
+# OpenThread
+#
+CONFIG_OPENTHREAD_ENABLED=y
+
+#
+# Thread Task Parameters
+#
+CONFIG_OPENTHREAD_TASK_SIZE=10240
+# end of Thread Task Parameters
+
+#
+# Thread Console
+#
+CONFIG_OPENTHREAD_CONSOLE_ENABLE=n
+# end of Thread Console
+
+#
+# Thread Core Features
+#
+CONFIG_OPENTHREAD_DNS64_CLIENT=y
+# end of Thread Core Features
+# end of OpenThread
+# end of ESP PSRAM

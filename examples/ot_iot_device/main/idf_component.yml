@@ -3,8 +3,14 @@ dependencies:
   espressif/esp_ot_cli_extension:
     version: "~2.0.0"
   espressif/cjson: "^1.7.19"
-  idf:
-    version: ">=4.1.0"
+  iot_device_core:
+    path: ../../common/iot_device_core
+  iot_cap_switch:
+    path: ../../common/iot_cap_switch
+  iot_cap_pwm_set:
+    path: ../../common/iot_cap_pwm_set
+  iot_cap_adc_read:
+    path: ../../common/iot_cap_adc_read
   ot_led:
     path: ${IDF_PATH}/examples/openthread/ot_common_components/ot_led
   ot_examples_common:
@@ -12,3 +18,5 @@ dependencies:
   esp-qa/coexist-cmd:
     version: "~0.0.1"
   espressif/led_strip: "^3.0.0"
+  idf:
+    version: ">=4.1.0"
