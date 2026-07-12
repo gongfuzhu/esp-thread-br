@@ -64,12 +64,13 @@ static const char *br_eui64_str(void) {
     return s;
 }
 
-static void publish_uplink(const char *payload, int len) {
+// suffix 为 topic 后缀(如 "cmd/resp"、"dev/up")。按接收资源分流，不看 payload 内容。
+static void publish_uplink_to(const char *suffix, const char *payload, int len) {
     if (s_client == NULL) {
         return;
     }
     char t[128];
-    snprintf(t, sizeof(t), "%s/cmd/resp", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX);
+    snprintf(t, sizeof(t), "%s/%s", CONFIG_MQTT_OT_BRIDGE_TOPIC_PREFIX, suffix);
     esp_mqtt_client_publish(s_client, t, payload, len, 0, 0);
 }
 
@@ -182,14 +183,30 @@ static void ack_request_handler(void *ctx, otMessage *msg, const otMessageInfo *
     (void)ctx; (void)info;
     char payload[COAP_PAYLOAD_MAX];
     int len = coap_read_payload(msg, payload, sizeof(payload));
-    ESP_LOGI(TAG, "/%s got %d bytes -> uplink", CONFIG_MQTT_OT_BRIDGE_ACK_URI, len);
-    publish_uplink(payload, len);
+    ESP_LOGI(TAG, "/%s got %d bytes -> cmd/resp", CONFIG_MQTT_OT_BRIDGE_ACK_URI, len);
+    publish_uplink_to("cmd/resp", payload, len);
     // 设备用 NON 上报时无需 ACK;若为 CON，从简不显式回 ACK。
 }
 
 static otCoapResource s_ack_resource = {
     .mUriPath = CONFIG_MQTT_OT_BRIDGE_ACK_URI,
     .mHandler = ack_request_handler,
+    .mContext = NULL,
+    .mNext = NULL,
+};
+
+static void devup_request_handler(void *ctx, otMessage *msg, const otMessageInfo *info) {
+    (void)ctx; (void)info;
+    char payload[COAP_PAYLOAD_MAX];
+    int len = coap_read_payload(msg, payload, sizeof(payload));
+    ESP_LOGI(TAG, "/%s got %d bytes -> dev/up", CONFIG_MQTT_OT_BRIDGE_DEVUP_URI, len);
+    publish_uplink_to("dev/up", payload, len);
+    // 设备用 NON 主动上报，无需 ACK。
+}
+
+static otCoapResource s_devup_resource = {
+    .mUriPath = CONFIG_MQTT_OT_BRIDGE_DEVUP_URI,
+    .mHandler = devup_request_handler,
     .mContext = NULL,
     .mNext = NULL,
 };
@@ -205,6 +222,7 @@ static esp_err_t coap_ensure_started(void) {
         err = otCoapStart(inst, CONFIG_MQTT_OT_BRIDGE_COAP_PORT);
         if (err == OT_ERROR_NONE) {
             otCoapAddResource(inst, &s_ack_resource);
+            otCoapAddResource(inst, &s_devup_resource);
             s_coap_started = true;
         }
     }
@@ -225,7 +243,7 @@ static void unicast_response_handler(void *ctx, otMessage *msg, const otMessageI
     }
     char payload[COAP_PAYLOAD_MAX];
     int len = coap_read_payload(msg, payload, sizeof(payload));
-    publish_uplink(payload, len);
+    publish_uplink_to("cmd/resp", payload, len);
 }
 
 // confirmable=true → 单播 CON(带响应回调);false → 组播 NON(无回调)。
