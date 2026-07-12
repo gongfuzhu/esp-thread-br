@@ -38,11 +38,12 @@ Router(BR)交互,进而控制 Thread 网内的 ESP32-H2 设备、接收设备上
 |------|-------|-----|----------|------|------|------|
 | 下行·单播 | `<prefix>/cmd/unicast/<eui64>` | 0 | 否 | 后端 | BR | 向指定设备发命令 |
 | 下行·组播 | `<prefix>/cmd/multicast` | 0 | 否 | 后端 | BR | 向全部设备广播命令 |
-| 上行·响应 | `<prefix>/dev/response` | 0 | 否 | BR | 后端 | 设备的响应/主动上报,原样透传 |
+| 上行·响应 | `<prefix>/cmd/resp` | 0 | 否 | BR | 后端 | 设备对下行命令的应答,原样透传 |
+| 上行·主动上报 | `<prefix>/dev/up` | 0 | 否 | BR | 后端 | 设备主动上报的事件(motion/boot/heartbeat),无对应下行命令 |
 | 设备清单 | `<prefix>/dev/registry` | 0 | **是** | BR | 后端 | 在线设备列表,retained + 周期刷新(默认 30s) |
 
 **后端需要做的**:
-- **订阅** `<prefix>/dev/response` 和 `<prefix>/dev/registry`
+- **订阅** `<prefix>/cmd/resp`、`<prefix>/dev/up` 和 `<prefix>/dev/registry`
 - **发布**到 `<prefix>/cmd/unicast/<eui64>` 或 `<prefix>/cmd/multicast`
 
 ---
@@ -124,16 +125,16 @@ Topic:   otbr/cmd/multicast
 Payload: {"reqid":"batch-0007","cmd":"off"}
 ```
 
-组播下每个设备都会**各自单播回执**到 `dev/response`(带随机 0~500ms 抖动避免风暴)。
+组播下每个设备都会**各自单播回执**到 `cmd/resp`(带随机 0~500ms 抖动避免风暴)。
 后端会收到**多条**响应,需凭 `reqid` + `id` 自行判断"收齐了几台"。
 
 ---
 
 ## 5. 上行响应/上报(设备 → 后端)
 
-所有设备的响应和主动上报,BR 都原样发布到**同一个** topic:
+所有设备对下行命令的应答,BR 都原样发布到:
 
-**Topic**: `otbr/dev/response`
+**Topic**: `otbr/cmd/resp`
 
 ### 5.1 控制设备的响应(`ot_iot_device`)
 
@@ -202,7 +203,7 @@ blink 回执示例(固定 `state:"off"` + `action:"blink"`):
 BR **不管** reqid。完整对账逻辑在后端:
 
 1. 下发单播命令时,后端生成唯一 `reqid`,记入待办表。
-2. 收到 `dev/response`,用 `id`+`reqid` 匹配待办,标记完成。
+2. 收到 `cmd/resp`,用 `id`+`reqid` 匹配待办,标记完成。
 3. 超时未收到响应 → 后端自行判定失败/重试(BR 不重传、不超时通知)。
 4. 组播:后端下发一个 `reqid`,预期收到 N 条带同 `reqid`、不同 `id` 的响应,
    自行统计"收齐/缺哪台"。
@@ -215,7 +216,7 @@ BR **不管** reqid。完整对账逻辑在后端:
  │  (记待办 req-0001)          ├───────────────────────────▶│ 执行 on
  │                             │                            │
  │                             │  ack ← 单播上报             │
- │       dev/response          │  {id,reqid:"req-0001",     │
+ │       cmd/resp              │  {id,reqid:"req-0001",     │
  │◀────────────────────────────┤   state:"on"}             │
  │  (匹配待办 req-0001 完成)   │◀───────────────────────────┤
 ```
@@ -225,11 +226,11 @@ BR **不管** reqid。完整对账逻辑在后端:
 ## 7. 快速对接清单(TL;DR)
 
 1. 连接 broker(`mqtt://<BR所在网段host>:1883`,账号见上),
-2. **订阅** `otbr/dev/response` 和 `otbr/dev/registry`,
+2. **订阅** `otbr/cmd/resp`、`otbr/dev/up` 和 `otbr/dev/registry`,
 3. 连上后立即从 retained 的 `dev/registry` 拿到设备列表,取 `eui64`,
 4. **控制**:publish 到 `otbr/cmd/unicast/<eui64>`,payload `{"reqid":"...","cmd":"on"}`,
-5. **收响应**:在 `otbr/dev/response` 上按 `id`+`reqid` 对账,
-6. **传感器**:深睡设备的 `motion`/`heartbeat` 事件也从 `otbr/dev/response` 收,凭 `event` 字段识别。
+5. **收响应**:在 `otbr/cmd/resp` 上按 `id`+`reqid` 对账,
+6. **传感器**:深睡设备的 `motion`/`heartbeat` 事件也从 `otbr/dev/up` 收,凭 `event` 字段识别(详见第 5 章"上行·主动上报一节)。
 
 ---
 
