@@ -15,18 +15,19 @@
 #define SERVO_ANGLE_MAX  180
 
 // gpio→channel 分配表(组件级 static 状态)。
+// servo 从高端(LEDC_CHANNEL_MAX-1 向下)分配, 避免与 pwm_set(从 0 向上) 冲突
 static int s_gpio_of_channel[LEDC_CHANNEL_MAX];
 static bool s_channel_used[LEDC_CHANNEL_MAX];
 static bool s_timer_ready = false;
 
 static int alloc_channel(int gpio) {
-    for (int c = 0; c < LEDC_CHANNEL_MAX; c++) {
+    for (int c = LEDC_CHANNEL_MAX - 1; c >= 0; c--) {
         if (s_channel_used[c] && s_gpio_of_channel[c] == gpio) return c;  // 复用
     }
-    for (int c = 0; c < LEDC_CHANNEL_MAX; c++) {
+    for (int c = LEDC_CHANNEL_MAX - 1; c >= 0; c--) {
         if (!s_channel_used[c]) { s_channel_used[c] = true; s_gpio_of_channel[c] = gpio; return c; }
     }
-    return -1;   // 耗尽
+    return -1;   // 耗尽(与 pwm_set 相向分配, 二者总和超过 LEDC_CHANNEL_MAX 时才会发生)
 }
 
 // angle(0..180) → 脉宽(us) → 占空比 raw(0..8191)。
