@@ -5,10 +5,14 @@
 
 #define TAG "iot_cap_servo_set"
 #define SERVO_MODE       LEDC_LOW_SPEED_MODE
-#define SERVO_RES        LEDC_TIMER_10_BIT       // 0..1023
-#define SERVO_MAX_DUTY   1023
-#define SERVO_TIMER      LEDC_TIMER_1
-#define SERVO_FREQ       50  // 50Hz for servo PWM
+#define SERVO_RES        LEDC_TIMER_13_BIT     // 0..8191
+#define SERVO_MAX_DUTY   8191
+#define SERVO_TIMER      LEDC_TIMER_1          // 独占，区别于 pwm_set 的 TIMER_0
+#define SERVO_FREQ_HZ    50                    // 20ms 周期
+#define SERVO_PERIOD_US  20000                 // 1e6 / 50Hz
+#define SERVO_MIN_US     500                   // 0°   → 0.5ms
+#define SERVO_MAX_US     2500                  // 180° → 2.5ms
+#define SERVO_ANGLE_MAX  180
 
 // gpio→channel 分配表(组件级 static 状态)。
 static int s_gpio_of_channel[LEDC_CHANNEL_MAX];
@@ -25,6 +29,12 @@ static int alloc_channel(int gpio) {
     return -1;   // 耗尽
 }
 
+// angle(0..180) → 脉宽(us) → 占空比 raw(0..8191)。
+static uint32_t angle_to_duty(int angle) {
+    int pulse_us = SERVO_MIN_US + (SERVO_MAX_US - SERVO_MIN_US) * angle / SERVO_ANGLE_MAX;
+    return (uint32_t)((uint64_t)pulse_us * SERVO_MAX_DUTY / SERVO_PERIOD_US);
+}
+
 static int servo_handler(const cJSON *data, cJSON *resp_data) {
     cJSON *jgpio = cJSON_GetObjectItem(data, "gpio");
     cJSON *jangle = cJSON_GetObjectItem(data, "angle");
@@ -33,14 +43,14 @@ static int servo_handler(const cJSON *data, cJSON *resp_data) {
     }
     int gpio = jgpio->valueint;
     int angle = jangle->valueint;
-    if (angle < 0 || angle > 180) {
+    if (angle < 0 || angle > SERVO_ANGLE_MAX) {
         return IOT_CODE_PARAM;
     }
 
     if (!s_timer_ready) {
         ledc_timer_config_t tc = {
             .speed_mode = SERVO_MODE, .duty_resolution = SERVO_RES,
-            .timer_num = SERVO_TIMER, .freq_hz = SERVO_FREQ, .clk_cfg = LEDC_AUTO_CLK,
+            .timer_num = SERVO_TIMER, .freq_hz = SERVO_FREQ_HZ, .clk_cfg = LEDC_AUTO_CLK,
         };
         if (ledc_timer_config(&tc) != ESP_OK) return IOT_CODE_HW;
         s_timer_ready = true;
@@ -49,14 +59,13 @@ static int servo_handler(const cJSON *data, cJSON *resp_data) {
     int ch = alloc_channel(gpio);
     if (ch < 0) return IOT_CODE_HW;   // 通道耗尽
 
-    // Calculate duty: 0.5ms @0° →26, 2.5ms@180°→128
-    uint32_t duty = 26 + ((128 - 26) * angle) / 180;
+    uint32_t raw = angle_to_duty(angle);
     ledc_channel_config_t cc = {
         .gpio_num = gpio, .speed_mode = SERVO_MODE, .channel = ch,
-        .timer_sel = SERVO_TIMER, .duty = duty, .hpoint = 0, .intr_type = LEDC_INTR_DISABLE,
+        .timer_sel = SERVO_TIMER, .duty = raw, .hpoint = 0, .intr_type = LEDC_INTR_DISABLE,
     };
     if (ledc_channel_config(&cc) != ESP_OK) return IOT_CODE_HW;
-    ledc_set_duty(SERVO_MODE, ch, duty);
+    ledc_set_duty(SERVO_MODE, ch, raw);
     ledc_update_duty(SERVO_MODE, ch);
 
     cJSON_AddNumberToObject(resp_data, "gpio", gpio);
