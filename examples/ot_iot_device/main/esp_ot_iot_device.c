@@ -37,6 +37,7 @@
 #include "iot_cap_switch.h"
 #include "iot_cap_pwm_set.h"
 #include "iot_cap_adc_read.h"
+#include "iot_cap_servo_set.h"
 
 #define TAG "ot_iot_device"
 
@@ -84,4 +85,5 @@ void app_main(void)
     iot_cap_switch_init();
     iot_cap_pwm_set_init();
     iot_cap_adc_read_init();
+    iot_cap_servo_set_init();
 }
